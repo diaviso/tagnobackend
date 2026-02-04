@@ -17,8 +17,12 @@ async function bootstrap() {
         crossOriginEmbedderPolicy: false,
     }));
     app.enableCors({
-        origin: true,
+        origin: process.env.NODE_ENV === 'production'
+            ? [process.env.FRONTEND_URL, /\.railway\.app$/]
+            : true,
         credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
     });
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
@@ -45,9 +49,10 @@ async function bootstrap() {
     const document = swagger_1.SwaggerModule.createDocument(app, config);
     swagger_1.SwaggerModule.setup('api/docs', app, document);
     const port = process.env.PORT || 3008;
-    await app.listen(port);
-    console.log(`🚀 Application running on: http://localhost:${port}`);
-    console.log(`📚 Swagger docs: http://localhost:${port}/api/docs`);
+    await app.listen(port, '0.0.0.0');
+    console.log(`🚀 Application running on port: ${port}`);
+    console.log(`📚 Swagger docs: /api/docs`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

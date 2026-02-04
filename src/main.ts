@@ -21,8 +21,12 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: true,
+    origin: process.env.NODE_ENV === 'production' 
+      ? [process.env.FRONTEND_URL, /\.railway\.app$/]
+      : true,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   app.useGlobalPipes(
@@ -56,10 +60,11 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || 3008;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`🚀 Application running on: http://localhost:${port}`);
-  console.log(`📚 Swagger docs: http://localhost:${port}/api/docs`);
+  console.log(`🚀 Application running on port: ${port}`);
+  console.log(`📚 Swagger docs: /api/docs`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 }
 
 bootstrap();

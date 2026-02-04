@@ -3,3 +3,11 @@ node_modules
 .env
 
 /generated/prisma
+dist
+.DS_Store
+*.log
+npm-debug.log*
+.vscode
+.idea
+uploads/*
+!uploads/.gitkeep
