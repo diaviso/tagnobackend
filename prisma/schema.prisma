@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============== ENUMS ==============
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserMode {
+  VOYAGEUR
+  PROPRIETAIRE
+}
+
+enum VehicleStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DocumentType {
+  INSURANCE
+  REGISTRATION
+  TECHNICAL_VISIT
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CarpoolTripStatus {
+  OPEN
+  FULL
+  CANCELLED
+  COMPLETED
+}
+
+enum CarpoolReservationStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum RentalBookingStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+// ============== MODELS ==============
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  googleId  String    @unique
+  firstName String?
+  lastName  String?
+  photoUrl  String?
+  role      Role      @default(USER)
+  userMode  UserMode?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  vehicles            Vehicle[]
+  carpoolTripsAsDriver CarpoolTrip[]
+  carpoolReservations CarpoolReservation[]
+  rentalBookings      RentalBooking[]
+
+  @@index([email])
+  @@index([googleId])
+  @@index([role])
+}
+
+model Vehicle {
+  id             String        @id @default(uuid())
+  ownerId        String
+  brand          String
+  model          String
+  year           Int
+  color          String
+  licensePlate   String        @unique
+  numberOfSeats  Int
+  isForRental    Boolean       @default(false)
+  isForCarpooling Boolean      @default(false)
+  isActive       Boolean       @default(true)
+  status         VehicleStatus @default(PENDING)
+  adminComment   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  photos      VehiclePhoto[]
+  documents   VehicleDocument[]
+  carpoolTrips CarpoolTrip[]
+  rentalOffer RentalOffer?
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([isForRental])
+  @@index([isForCarpooling])
+  @@index([isActive])
+}
+
+model VehiclePhoto {
+  id        String   @id @default(uuid())
+  vehicleId String
+  url       String
+  isMain    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+}
+
+model VehicleDocument {
+  id        String         @id @default(uuid())
+  vehicleId String
+  type      DocumentType
+  fileUrl   String
+  status    DocumentStatus @default(PENDING)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([status])
+}
+
+model CarpoolTrip {
+  id             String            @id @default(uuid())
+  vehicleId      String
+  driverId       String
+  departureCity  String
+  arrivalCity    String
+  departureTime  DateTime
+  pricePerSeat   Int
+  availableSeats Int
+  status         CarpoolTripStatus @default(OPEN)
+  createdAt      DateTime          @default(now())
+
+  vehicle      Vehicle              @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driver       User                 @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  reservations CarpoolReservation[]
+
+  @@index([driverId])
+  @@index([vehicleId])
+  @@index([departureCity])
+  @@index([arrivalCity])
+  @@index([departureTime])
+  @@index([status])
+}
+
+model CarpoolReservation {
+  id            String                    @id @default(uuid())
+  tripId        String
+  passengerId   String
+  seatsReserved Int
+  status        CarpoolReservationStatus  @default(PENDING)
+  createdAt     DateTime                  @default(now())
+
+  trip      CarpoolTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  passenger User        @relation(fields: [passengerId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([passengerId])
+  @@index([status])
+}
+
+model RentalOffer {
+  id            String   @id @default(uuid())
+  vehicleId     String   @unique
+  pricePerDay   Int
+  depositAmount Int
+  minDays       Int      @default(1)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  vehicle  Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  bookings RentalBooking[]
+
+  @@index([isActive])
+  @@index([pricePerDay])
+}
+
+model RentalBooking {
+  id            String              @id @default(uuid())
+  rentalOfferId String
+  renterId      String
+  startDate     DateTime            @db.Date
+  endDate       DateTime            @db.Date
+  totalPrice    Int
+  status        RentalBookingStatus @default(PENDING)
+  createdAt     DateTime            @default(now())
+
+  rentalOffer RentalOffer @relation(fields: [rentalOfferId], references: [id], onDelete: Cascade)
+  renter      User        @relation(fields: [renterId], references: [id], onDelete: Cascade)
+
+  @@index([rentalOfferId])
+  @@index([renterId])
+  @@index([status])
+  @@index([startDate, endDate])
+}
