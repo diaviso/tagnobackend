@@ -11,7 +11,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nes
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { UploadService } from './upload.service';
 
 @ApiTags('upload')
@@ -40,7 +40,7 @@ export class UploadController {
       storage: diskStorage({
         destination: './uploads',
         filename: (req, file, callback) => {
-          const uniqueSuffix = uuidv4();
+          const uniqueSuffix = randomUUID();
           const ext = extname(file.originalname);
           callback(null, `${uniqueSuffix}${ext}`);
         },
