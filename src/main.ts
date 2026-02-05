@@ -22,7 +22,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: process.env.NODE_ENV === 'production' 
-      ? [process.env.FRONTEND_URL, /\.railway\.app$/]
+      ? [process.env.FRONTEND_URL, /\.railway\.app$/, /\.vercel\.app$/]
       : true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
