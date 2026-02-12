@@ -56,21 +56,23 @@ export class MailService {
     </table>`;
   }
 
-  async sendVerificationEmail(to: string, firstName: string, token: string): Promise<void> {
-    const verifyUrl = `${this.frontendUrl}/verify-email?token=${token}`;
-
+  async sendVerificationEmail(to: string, firstName: string, code: string): Promise<void> {
     const html = this.baseTemplate(`
       <h2 style="margin:0 0 16px;color:#111827;font-size:22px;">Bienvenue ${firstName} !</h2>
       <p style="color:#4b5563;font-size:15px;line-height:1.6;">
-        Merci de vous être inscrit sur <strong>TAAGNO</strong>. Pour activer votre compte, veuillez confirmer votre adresse email en cliquant sur le bouton ci-dessous.
+        Merci de vous être inscrit sur <strong>TAAGNO</strong>. Pour activer votre compte, entrez le code de vérification ci-dessous :
       </p>
-      ${this.button(verifyUrl, 'Vérifier mon email')}
-      <p style="color:#6b7280;font-size:13px;">Ce lien expire dans <strong>24 heures</strong>.</p>
+      <div style="margin:28px auto;text-align:center;">
+        <div style="display:inline-block;background:#f3f4f6;border:2px dashed #2563eb;border-radius:12px;padding:20px 40px;">
+          <span style="font-size:36px;font-weight:700;letter-spacing:8px;color:#2563eb;">${code}</span>
+        </div>
+      </div>
+      <p style="color:#6b7280;font-size:13px;text-align:center;">Ce code expire dans <strong>15 minutes</strong>.</p>
       <p style="color:#9ca3af;font-size:12px;margin-top:20px;">Si vous n'avez pas créé de compte, ignorez cet email.</p>
     `);
 
     try {
-      await this.mailerService.sendMail({ to, subject: 'Vérifiez votre adresse email — TAAGNO', html });
+      await this.mailerService.sendMail({ to, subject: 'Votre code de vérification — TAAGNO', html });
       this.logger.log(`Verification email sent to ${to}`);
     } catch (error) {
       this.logger.error(`Failed to send verification email to ${to}`, error);

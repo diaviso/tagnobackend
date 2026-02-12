@@ -73,12 +73,13 @@ model User {
   role                 Role      @default(USER)
   userMode             UserMode?
   isActive             Boolean   @default(true)
-  emailVerified        Boolean   @default(false)
-  verificationToken    String?
-  resetPasswordToken   String?
-  resetPasswordExpires DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  emailVerified             Boolean   @default(false)
+  verificationCode          String?
+  verificationCodeExpires   DateTime?
+  resetPasswordToken        String?
+  resetPasswordExpires      DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
   vehicles            Vehicle[]
   carpoolTripsAsDriver CarpoolTrip[]
@@ -88,7 +89,7 @@ model User {
   @@index([email])
   @@index([googleId])
   @@index([role])
-  @@index([verificationToken])
+  @@index([verificationCode])
   @@index([resetPasswordToken])
 }
 

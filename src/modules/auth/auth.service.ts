@@ -1,8 +1,8 @@
-import { Injectable, BadRequestException, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
-import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ResendCodeDto } from './dto';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -29,6 +29,10 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
   ) {}
+
+  private generateVerificationCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
 
   // ==================== Google OAuth ====================
 
@@ -58,31 +62,53 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const existingUser = await this.usersService.findByEmail(dto.email);
+
+    const verificationCode = this.generateVerificationCode();
+    const codeExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const hashedPassword = await bcrypt.hash(dto.password, 12);
+
     if (existingUser) {
-      throw new ConflictException('Un compte avec cet email existe déjà');
+      // If user exists and is already verified, block registration
+      if (existingUser.emailVerified) {
+        // If it's a Google-only account (no password), also block
+        throw new BadRequestException('Un compte avec cet email existe déjà. Essayez de vous connecter.');
+      }
+
+      // User exists but NOT verified → regenerate code, update password, resend email
+      await this.usersService.updateVerificationCode(
+        existingUser.id,
+        verificationCode,
+        codeExpires,
+        hashedPassword,
+      );
+
+      await this.mailService.sendVerificationEmail(
+        dto.email,
+        dto.firstName || existingUser.firstName || '',
+        verificationCode,
+      );
+
+      return {
+        message: 'Un nouveau code de vérification a été envoyé à votre adresse email.',
+        email: dto.email,
+      };
     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, 12);
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-
+    // New user → create account
     const user = await this.usersService.createWithPassword({
       email: dto.email,
       password: hashedPassword,
       firstName: dto.firstName,
       lastName: dto.lastName,
-      verificationToken,
+      verificationCode,
+      verificationCodeExpires: codeExpires,
     });
 
-    // Send verification email
-    try {
-      await this.mailService.sendVerificationEmail(user.email, user.firstName || '', verificationToken);
-    } catch (error) {
-      this.logger.error(`Failed to send verification email to ${user.email}`, error);
-    }
+    await this.mailService.sendVerificationEmail(user.email, user.firstName || '', verificationCode);
 
     return {
-      message: 'Inscription réussie ! Vérifiez votre email pour activer votre compte.',
-      userId: user.id,
+      message: 'Inscription réussie ! Un code de vérification a été envoyé à votre adresse email.',
+      email: user.email,
     };
   }
 
@@ -99,7 +125,7 @@ export class AuthService {
     }
 
     if (!user.emailVerified) {
-      throw new UnauthorizedException('Veuillez vérifier votre email avant de vous connecter');
+      throw new UnauthorizedException('Veuillez vérifier votre email avant de vous connecter. Vérifiez votre boîte de réception.');
     }
 
     if (!user.isActive) {
@@ -121,16 +147,16 @@ export class AuthService {
     };
   }
 
-  async verifyEmail(token: string) {
-    const user = await this.usersService.findByVerificationToken(token);
+  async verifyEmail(email: string, code: string) {
+    const user = await this.usersService.findByVerificationCode(code, email);
 
     if (!user) {
-      throw new BadRequestException('Token de vérification invalide ou expiré');
+      throw new BadRequestException('Code de vérification invalide ou expiré. Veuillez réessayer.');
     }
 
     await this.usersService.verifyEmail(user.id);
 
-    // Send welcome email
+    // Send welcome email (non-blocking)
     try {
       await this.mailService.sendWelcomeEmail(user.email, user.firstName || '');
     } catch (error) {
@@ -138,6 +164,28 @@ export class AuthService {
     }
 
     return { message: 'Email vérifié avec succès ! Vous pouvez maintenant vous connecter.' };
+  }
+
+  async resendCode(dto: ResendCodeDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+
+    if (!user) {
+      // Don't reveal if account exists
+      return { message: 'Si un compte non vérifié existe avec cet email, un nouveau code a été envoyé.' };
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException('Ce compte est déjà vérifié. Vous pouvez vous connecter.');
+    }
+
+    const verificationCode = this.generateVerificationCode();
+    const codeExpires = new Date(Date.now() + 15 * 60 * 1000);
+
+    await this.usersService.updateVerificationCode(user.id, verificationCode, codeExpires);
+
+    await this.mailService.sendVerificationEmail(user.email, user.firstName || '', verificationCode);
+
+    return { message: 'Un nouveau code de vérification a été envoyé à votre adresse email.' };
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
@@ -153,13 +201,10 @@ export class AuthService {
 
     await this.usersService.setResetPasswordToken(user.id, resetToken, expires);
 
-    try {
-      await this.mailService.sendPasswordResetEmail(user.email, user.firstName || '', resetToken);
-    } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${user.email}`, error);
-    }
+    // Propagate error so the frontend knows if the email failed
+    await this.mailService.sendPasswordResetEmail(user.email, user.firstName || '', resetToken);
 
-    return { message: 'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.' };
+    return { message: 'Un lien de réinitialisation a été envoyé à votre adresse email.' };
   }
 
   async resetPassword(dto: ResetPasswordDto) {
@@ -172,7 +217,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(dto.password, 12);
     await this.usersService.resetPassword(user.id, hashedPassword);
 
-    // Send confirmation email
+    // Send confirmation email (non-blocking)
     try {
       await this.mailService.sendPasswordChangedEmail(user.email, user.firstName || '');
     } catch (error) {

@@ -15,7 +15,8 @@ interface CreateUserWithPasswordDto {
   password: string;
   firstName: string;
   lastName: string;
-  verificationToken: string;
+  verificationCode: string;
+  verificationCodeExpires: Date;
 }
 
 @Injectable()
@@ -43,7 +44,8 @@ export class UsersService {
         firstName: data.firstName,
         lastName: data.lastName,
         emailVerified: false,
-        verificationToken: data.verificationToken,
+        verificationCode: data.verificationCode,
+        verificationCodeExpires: data.verificationCodeExpires,
       },
     });
   }
@@ -86,9 +88,13 @@ export class UsersService {
     });
   }
 
-  async findByVerificationToken(token: string) {
+  async findByVerificationCode(code: string, email: string) {
     return this.prisma.user.findFirst({
-      where: { verificationToken: token },
+      where: {
+        email,
+        verificationCode: code,
+        verificationCodeExpires: { gt: new Date() },
+      },
     });
   }
 
@@ -106,8 +112,23 @@ export class UsersService {
       where: { id },
       data: {
         emailVerified: true,
-        verificationToken: null,
+        verificationCode: null,
+        verificationCodeExpires: null,
       },
+    });
+  }
+
+  async updateVerificationCode(id: string, code: string, expires: Date, password?: string) {
+    const data: any = {
+      verificationCode: code,
+      verificationCodeExpires: expires,
+    };
+    if (password) {
+      data.password = password;
+    }
+    return this.prisma.user.update({
+      where: { id },
+      data,
     });
   }
 

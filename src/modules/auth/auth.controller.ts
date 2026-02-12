@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Query,
   UseGuards,
   Req,
   Res,
@@ -15,7 +14,7 @@ import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto, ResendCodeDto } from './dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -39,12 +38,16 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
-  @Get('verify-email')
-  @ApiOperation({ summary: 'Vérifier l\'email avec le token' })
-  async verifyEmail(@Query('token') token: string, @Res() res: Response) {
-    await this.authService.verifyEmail(token);
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    res.redirect(`${frontendUrl}/login?verified=true`);
+  @Post('verify-email')
+  @ApiOperation({ summary: 'Vérifier l\'email avec le code' })
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.email, dto.code);
+  }
+
+  @Post('resend-code')
+  @ApiOperation({ summary: 'Renvoyer le code de vérification' })
+  async resendCode(@Body() dto: ResendCodeDto) {
+    return this.authService.resendCode(dto);
   }
 
   @Post('forgot-password')
