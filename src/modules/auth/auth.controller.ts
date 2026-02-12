@@ -1,6 +1,9 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
+  Query,
   UseGuards,
   Req,
   Res,
@@ -12,6 +15,7 @@ import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -20,6 +24,42 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
   ) {}
+
+  // ==================== Email/Password Auth ====================
+
+  @Post('register')
+  @ApiOperation({ summary: 'Inscription par email/mot de passe' })
+  async register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
+
+  @Post('login')
+  @ApiOperation({ summary: 'Connexion par email/mot de passe' })
+  async login(@Body() dto: LoginDto) {
+    return this.authService.login(dto);
+  }
+
+  @Get('verify-email')
+  @ApiOperation({ summary: 'Vérifier l\'email avec le token' })
+  async verifyEmail(@Query('token') token: string, @Res() res: Response) {
+    await this.authService.verifyEmail(token);
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/login?verified=true`);
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Demander la réinitialisation du mot de passe' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Réinitialiser le mot de passe' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
+  // ==================== Google OAuth ====================
 
   @Get('google')
   @UseGuards(AuthGuard('google'))
@@ -38,6 +78,8 @@ export class AuthController {
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     res.redirect(`${frontendUrl}/login?token=${result.access_token}`);
   }
+
+  // ==================== Common ====================
 
   @Get('me')
   @UseGuards(JwtAuthGuard)

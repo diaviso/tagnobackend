@@ -63,17 +63,22 @@ enum RentalBookingStatus {
 // ============== MODELS ==============
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  googleId  String    @unique
-  firstName String?
-  lastName  String?
-  photoUrl  String?
-  role      Role      @default(USER)
-  userMode  UserMode?
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                   String    @id @default(uuid())
+  email                String    @unique
+  googleId             String?   @unique
+  password             String?
+  firstName            String?
+  lastName             String?
+  photoUrl             String?
+  role                 Role      @default(USER)
+  userMode             UserMode?
+  isActive             Boolean   @default(true)
+  emailVerified        Boolean   @default(false)
+  verificationToken    String?
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   vehicles            Vehicle[]
   carpoolTripsAsDriver CarpoolTrip[]
@@ -83,6 +88,8 @@ model User {
   @@index([email])
   @@index([googleId])
   @@index([role])
+  @@index([verificationToken])
+  @@index([resetPasswordToken])
 }
 
 model Vehicle {

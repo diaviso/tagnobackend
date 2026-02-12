@@ -14,6 +14,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { CarpoolModule } from './modules/carpool/carpool.module';
 import { RentalModule } from './modules/rental/rental.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { UploadModule } from './modules/upload/upload.module';
     CarpoolModule,
     RentalModule,
     UploadModule,
+    MailModule,
   ],
   providers: [
     {
