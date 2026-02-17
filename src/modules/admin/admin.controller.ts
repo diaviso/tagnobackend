@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
@@ -12,7 +13,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AdminService } from './admin.service';
-import { AdminVehicleQueryDto, RejectVehicleDto, AdminUserQueryDto, UpdateUserRoleDto } from './dto/admin-vehicle.dto';
+import {
+  AdminVehicleQueryDto,
+  RejectVehicleDto,
+  UpdateVehicleStatusDto,
+  AdminUserQueryDto,
+  UpdateUserRoleDto,
+} from './dto/admin-vehicle.dto';
 
 @ApiTags('admin')
 @Controller('admin')
@@ -57,6 +64,15 @@ export class AdminController {
     return this.adminService.rejectVehicle(id, dto.comment);
   }
 
+  @Patch('vehicles/:id/status')
+  @ApiOperation({ summary: 'Changer le statut d\'un véhicule (approuver, refuser, remettre en attente)' })
+  async updateVehicleStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateVehicleStatusDto,
+  ) {
+    return this.adminService.updateVehicleStatus(id, dto.status, dto.comment);
+  }
+
   // ============== USERS ==============
   @Get('users')
   @ApiOperation({ summary: 'Lister les utilisateurs' })
@@ -68,6 +84,12 @@ export class AdminController {
   @ApiOperation({ summary: 'Obtenir les détails d\'un utilisateur' })
   async getUserById(@Param('id') id: string) {
     return this.adminService.getUserById(id);
+  }
+
+  @Get('users/:id/dependencies')
+  @ApiOperation({ summary: 'Obtenir les dépendances d\'un utilisateur avant suppression' })
+  async getUserDependencies(@Param('id') id: string) {
+    return this.adminService.getUserDependencies(id);
   }
 
   @Patch('users/:id/role')
@@ -83,5 +105,11 @@ export class AdminController {
   @ApiOperation({ summary: 'Activer/désactiver un utilisateur' })
   async toggleUserActive(@Param('id') id: string) {
     return this.adminService.toggleUserActive(id);
+  }
+
+  @Delete('users/:id')
+  @ApiOperation({ summary: 'Supprimer un utilisateur et toutes ses données' })
+  async deleteUser(@Param('id') id: string) {
+    return this.adminService.deleteUser(id);
   }
 }

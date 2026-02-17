@@ -199,6 +199,36 @@ export class AdminService {
     });
   }
 
+  async updateVehicleStatus(id: string, status: VehicleStatus, comment?: string) {
+    const vehicle = await this.prisma.vehicle.findUnique({
+      where: { id },
+    });
+
+    if (!vehicle) {
+      throw new NotFoundException('Véhicule non trouvé');
+    }
+
+    return this.prisma.vehicle.update({
+      where: { id },
+      data: {
+        status,
+        adminComment: comment || null,
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        photos: true,
+        documents: true,
+      },
+    });
+  }
+
   // ============== USERS ==============
   async findUsers(search?: string) {
     const where = search
@@ -245,32 +275,55 @@ export class AdminService {
         lastName: true,
         photoUrl: true,
         role: true,
+        userMode: true,
         isActive: true,
+        emailVerified: true,
         createdAt: true,
         updatedAt: true,
+        _count: {
+          select: {
+            vehicles: true,
+            carpoolTripsAsDriver: true,
+            carpoolReservations: true,
+            rentalBookings: true,
+          },
+        },
         vehicles: {
           include: {
             photos: true,
+            rentalOffer: true,
           },
+          orderBy: { createdAt: 'desc' },
         },
         carpoolTripsAsDriver: {
-          take: 10,
-          orderBy: { createdAt: 'desc' },
-        },
-        carpoolReservations: {
-          take: 10,
+          take: 20,
           orderBy: { createdAt: 'desc' },
           include: {
-            trip: true,
+            vehicle: { select: { brand: true, model: true, licensePlate: true } },
+            _count: { select: { reservations: true } },
+          },
+        },
+        carpoolReservations: {
+          take: 20,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            trip: {
+              include: {
+                driver: { select: { firstName: true, lastName: true } },
+                vehicle: { select: { brand: true, model: true } },
+              },
+            },
           },
         },
         rentalBookings: {
-          take: 10,
+          take: 20,
           orderBy: { createdAt: 'desc' },
           include: {
             rentalOffer: {
               include: {
-                vehicle: true,
+                vehicle: {
+                  select: { brand: true, model: true, licensePlate: true },
+                },
               },
             },
           },
@@ -283,6 +336,64 @@ export class AdminService {
     }
 
     return user;
+  }
+
+  async getUserDependencies(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('Utilisateur non trouvé');
+    }
+
+    const [vehicles, carpoolTrips, carpoolReservations, rentalBookings] = await Promise.all([
+      this.prisma.vehicle.count({ where: { ownerId: id } }),
+      this.prisma.carpoolTrip.count({ where: { driverId: id } }),
+      this.prisma.carpoolReservation.count({ where: { passengerId: id } }),
+      this.prisma.rentalBooking.count({ where: { renterId: id } }),
+    ]);
+
+    // Count sub-entities that will be cascade-deleted via vehicles
+    const vehicleIds = await this.prisma.vehicle.findMany({
+      where: { ownerId: id },
+      select: { id: true },
+    });
+    const vIds = vehicleIds.map(v => v.id);
+
+    const [vehiclePhotos, vehicleDocuments, rentalOffers, vehicleCarpoolTrips] = vIds.length > 0
+      ? await Promise.all([
+          this.prisma.vehiclePhoto.count({ where: { vehicleId: { in: vIds } } }),
+          this.prisma.vehicleDocument.count({ where: { vehicleId: { in: vIds } } }),
+          this.prisma.rentalOffer.count({ where: { vehicleId: { in: vIds } } }),
+          this.prisma.carpoolTrip.count({ where: { vehicleId: { in: vIds } } }),
+        ])
+      : [0, 0, 0, 0];
+
+    return {
+      vehicles,
+      vehiclePhotos,
+      vehicleDocuments,
+      rentalOffers,
+      carpoolTrips,
+      vehicleCarpoolTrips,
+      carpoolReservations,
+      rentalBookings,
+      total: vehicles + carpoolTrips + carpoolReservations + rentalBookings,
+    };
+  }
+
+  async deleteUser(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('Utilisateur non trouvé');
+    }
+
+    if (user.role === 'ADMIN') {
+      throw new BadRequestException('Impossible de supprimer un administrateur');
+    }
+
+    // Prisma cascade will handle all dependent entities
+    await this.prisma.user.delete({ where: { id } });
+
+    return { message: 'Utilisateur supprimé avec succès' };
   }
 
   async updateUserRole(id: string, role: 'USER' | 'ADMIN') {

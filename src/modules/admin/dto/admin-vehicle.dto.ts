@@ -26,6 +26,17 @@ export class RejectVehicleDto {
   comment?: string;
 }
 
+export class UpdateVehicleStatusDto {
+  @ApiProperty({ enum: VehicleStatus, description: 'Nouveau statut du véhicule' })
+  @IsEnum(VehicleStatus)
+  status: VehicleStatus;
+
+  @ApiProperty({ required: false, description: 'Motif du changement de statut' })
+  @IsString()
+  @IsOptional()
+  comment?: string;
+}
+
 export class AdminUserQueryDto {
   @ApiProperty({ required: false, description: 'Recherche par email, nom ou prénom' })
   @IsString()
