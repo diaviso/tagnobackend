@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
@@ -82,11 +82,16 @@ export class AuthService {
         hashedPassword,
       );
 
-      await this.mailService.sendVerificationEmail(
-        dto.email,
-        dto.firstName || existingUser.firstName || '',
-        verificationCode,
-      );
+      try {
+        await this.mailService.sendVerificationEmail(
+          dto.email,
+          dto.firstName || existingUser.firstName || '',
+          verificationCode,
+        );
+      } catch (error) {
+        this.logger.error(`Failed to send verification email to ${dto.email}`, error);
+        throw new InternalServerErrorException('Impossible d\'envoyer l\'email de vérification. Veuillez réessayer plus tard.');
+      }
 
       return {
         message: 'Un nouveau code de vérification a été envoyé à votre adresse email.',
@@ -104,7 +109,12 @@ export class AuthService {
       verificationCodeExpires: codeExpires,
     });
 
-    await this.mailService.sendVerificationEmail(user.email, user.firstName || '', verificationCode);
+    try {
+      await this.mailService.sendVerificationEmail(user.email, user.firstName || '', verificationCode);
+    } catch (error) {
+      this.logger.error(`Failed to send verification email to ${user.email}`, error);
+      throw new InternalServerErrorException('Inscription enregistrée mais l\'envoi de l\'email a échoué. Utilisez "Renvoyer le code" pour réessayer.');
+    }
 
     return {
       message: 'Inscription réussie ! Un code de vérification a été envoyé à votre adresse email.',
@@ -183,7 +193,12 @@ export class AuthService {
 
     await this.usersService.updateVerificationCode(user.id, verificationCode, codeExpires);
 
-    await this.mailService.sendVerificationEmail(user.email, user.firstName || '', verificationCode);
+    try {
+      await this.mailService.sendVerificationEmail(user.email, user.firstName || '', verificationCode);
+    } catch (error) {
+      this.logger.error(`Failed to resend verification email to ${user.email}`, error);
+      throw new InternalServerErrorException('Impossible d\'envoyer l\'email de vérification. Veuillez réessayer plus tard.');
+    }
 
     return { message: 'Un nouveau code de vérification a été envoyé à votre adresse email.' };
   }
@@ -201,8 +216,12 @@ export class AuthService {
 
     await this.usersService.setResetPasswordToken(user.id, resetToken, expires);
 
-    // Propagate error so the frontend knows if the email failed
-    await this.mailService.sendPasswordResetEmail(user.email, user.firstName || '', resetToken);
+    try {
+      await this.mailService.sendPasswordResetEmail(user.email, user.firstName || '', resetToken);
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to ${user.email}`, error);
+      throw new InternalServerErrorException('Impossible d\'envoyer l\'email de réinitialisation. Veuillez réessayer plus tard.');
+    }
 
     return { message: 'Un lien de réinitialisation a été envoyé à votre adresse email.' };
   }
