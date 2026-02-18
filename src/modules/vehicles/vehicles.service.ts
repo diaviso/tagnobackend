@@ -14,6 +14,16 @@ import { AddDocumentDto } from './dto/add-document.dto';
 export class VehiclesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async resetStatusIfNeeded(vehicleId: string): Promise<void> {
+    const vehicle = await this.prisma.vehicle.findUnique({ where: { id: vehicleId }, select: { status: true } });
+    if (vehicle && vehicle.status !== 'PENDING') {
+      await this.prisma.vehicle.update({
+        where: { id: vehicleId },
+        data: { status: 'PENDING', adminComment: null },
+      });
+    }
+  }
+
   async create(ownerId: string, dto: CreateVehicleDto) {
     const existingVehicle = await this.prisma.vehicle.findUnique({
       where: { licensePlate: dto.licensePlate },
@@ -77,6 +87,8 @@ export class VehiclesService {
       throw new ForbiddenException('Vous ne pouvez modifier que vos propres véhicules');
     }
 
+    await this.resetStatusIfNeeded(id);
+
     return this.prisma.vehicle.update({
       where: { id },
       data: dto,
@@ -101,13 +113,17 @@ export class VehiclesService {
       });
     }
 
-    return this.prisma.vehiclePhoto.create({
+    const photo = await this.prisma.vehiclePhoto.create({
       data: {
         vehicleId,
         url: dto.url,
         isMain: dto.isMain || false,
       },
     });
+
+    await this.resetStatusIfNeeded(vehicleId);
+
+    return photo;
   }
 
   async addDocument(vehicleId: string, userId: string, dto: AddDocumentDto) {
@@ -117,13 +133,17 @@ export class VehiclesService {
       throw new ForbiddenException('Vous ne pouvez ajouter des documents qu\'à vos propres véhicules');
     }
 
-    return this.prisma.vehicleDocument.create({
+    const document = await this.prisma.vehicleDocument.create({
       data: {
         vehicleId,
         type: dto.type,
         fileUrl: dto.fileUrl,
       },
     });
+
+    await this.resetStatusIfNeeded(vehicleId);
+
+    return document;
   }
 
   async findApprovedById(id: string) {
@@ -182,6 +202,7 @@ export class VehiclesService {
     }
 
     await this.prisma.vehiclePhoto.delete({ where: { id: photoId } });
+    await this.resetStatusIfNeeded(vehicleId);
 
     if (photo.isMain) {
       const firstPhoto = await this.prisma.vehiclePhoto.findFirst({
@@ -219,10 +240,14 @@ export class VehiclesService {
       data: { isMain: false },
     });
 
-    return this.prisma.vehiclePhoto.update({
+    await this.prisma.vehiclePhoto.update({
       where: { id: photoId },
       data: { isMain: true },
     });
+
+    await this.resetStatusIfNeeded(vehicleId);
+
+    return this.findById(vehicleId);
   }
 
   async deleteDocument(vehicleId: string, documentId: string, userId: string) {
@@ -241,6 +266,7 @@ export class VehiclesService {
     }
 
     await this.prisma.vehicleDocument.delete({ where: { id: documentId } });
+    await this.resetStatusIfNeeded(vehicleId);
 
     return { success: true };
   }
