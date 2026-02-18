@@ -463,9 +463,6 @@ export class RentalService {
           },
         },
         bookings: {
-          where: {
-            status: { in: ['PENDING', 'CONFIRMED'] },
-          },
           include: {
             renter: {
               select: {
@@ -476,7 +473,7 @@ export class RentalService {
               },
             },
           },
-          orderBy: { startDate: 'asc' },
+          orderBy: { createdAt: 'desc' },
         },
       },
       orderBy: { createdAt: 'desc' },
