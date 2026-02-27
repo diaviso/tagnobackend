@@ -1,13 +1,7 @@
 import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
 import 'dotenv/config';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 // IDs des utilisateurs existants
 const ADMIN_ID = '99c95827-4bae-4c6f-9e47-7a0782eb37d5';
@@ -17,12 +11,53 @@ const USER2_ID = 'dba44074-ff7f-48f2-b4f9-b97d26f8a58b';
 async function main() {
   console.log('🌱 Seeding database with test data...');
 
-  // Mettre à jour l'admin avec le rôle ADMIN
-  await prisma.user.update({
+  // Créer les utilisateurs de test
+  await prisma.user.upsert({
     where: { id: ADMIN_ID },
-    data: { role: 'ADMIN' },
+    update: { role: 'ADMIN' },
+    create: {
+      id: ADMIN_ID,
+      email: 'admin@taagno.com',
+      password: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36PQm2Pro/V9jCKbSzmlCXO', // password123
+      firstName: 'Admin',
+      lastName: 'Taagno',
+      role: 'ADMIN',
+      emailVerified: true,
+      userMode: 'VOYAGEUR',
+    },
   });
-  console.log('✅ Admin role updated');
+
+  await prisma.user.upsert({
+    where: { id: USER1_ID },
+    update: {},
+    create: {
+      id: USER1_ID,
+      email: 'user1@taagno.com',
+      password: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36PQm2Pro/V9jCKbSzmlCXO', // password123
+      firstName: 'Amadou',
+      lastName: 'Diallo',
+      role: 'USER',
+      emailVerified: true,
+      userMode: 'PROPRIETAIRE',
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { id: USER2_ID },
+    update: {},
+    create: {
+      id: USER2_ID,
+      email: 'user2@taagno.com',
+      password: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36PQm2Pro/V9jCKbSzmlCXO', // password123
+      firstName: 'Fatou',
+      lastName: 'Ndiaye',
+      role: 'USER',
+      emailVerified: true,
+      userMode: 'PROPRIETAIRE',
+    },
+  });
+
+  console.log('✅ Users created (admin + 2 users)');
 
   // ============== VÉHICULES USER 1 ==============
   console.log('\n📦 Creating vehicles for User 1...');
@@ -545,5 +580,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-    await pool.end();
   });

@@ -13,6 +13,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CarpoolService } from './carpool.service';
 import { CreateTripDto } from './dto/create-trip.dto';
+import { UpdateTripDto } from './dto/update-trip.dto';
 import { SearchTripDto } from './dto/search-trip.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 
@@ -41,6 +42,18 @@ export class CarpoolController {
   @ApiOperation({ summary: 'Rechercher des trajets disponibles' })
   async searchTrips(@Query() query: SearchTripDto) {
     return this.carpoolService.searchTrips(query);
+  }
+
+  @Patch('trips/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Modifier un trajet (conducteur)' })
+  async updateTrip(
+    @Param('id') tripId: string,
+    @CurrentUser() user: any,
+    @Body() dto: UpdateTripDto,
+  ) {
+    return this.carpoolService.updateTrip(tripId, user.id, dto);
   }
 
   @Get('trips/:id')

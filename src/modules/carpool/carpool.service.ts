@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
 import { CreateTripDto } from './dto/create-trip.dto';
+import { UpdateTripDto } from './dto/update-trip.dto';
 import { SearchTripDto } from './dto/search-trip.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 
@@ -59,6 +60,59 @@ export class CarpoolService {
             firstName: true,
             lastName: true,
             photoUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async updateTrip(tripId: string, driverId: string, dto: UpdateTripDto) {
+    const trip = await this.prisma.carpoolTrip.findUnique({
+      where: { id: tripId },
+    });
+
+    if (!trip) {
+      throw new NotFoundException('Trajet non trouvé');
+    }
+
+    if (trip.driverId !== driverId) {
+      throw new ForbiddenException('Vous n\'êtes pas le conducteur de ce trajet');
+    }
+
+    if (trip.status !== 'OPEN') {
+      throw new BadRequestException('Seuls les trajets ouverts peuvent être modifiés');
+    }
+
+    const data: any = {};
+    if (dto.departureCity !== undefined) data.departureCity = dto.departureCity;
+    if (dto.arrivalCity !== undefined) data.arrivalCity = dto.arrivalCity;
+    if (dto.departureTime !== undefined) data.departureTime = new Date(dto.departureTime);
+    if (dto.pricePerSeat !== undefined) data.pricePerSeat = dto.pricePerSeat;
+    if (dto.availableSeats !== undefined) data.availableSeats = dto.availableSeats;
+
+    return this.prisma.carpoolTrip.update({
+      where: { id: tripId },
+      data,
+      include: {
+        vehicle: true,
+        driver: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            photoUrl: true,
+          },
+        },
+        reservations: {
+          include: {
+            passenger: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                photoUrl: true,
+              },
+            },
           },
         },
       },
